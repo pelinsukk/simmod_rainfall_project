@@ -12,3 +12,12 @@ __pycache__/
 
 # logs
 *.log
+
+# Ignore generated outputs by default
+outputs/
+
+# Keep demo artifacts
+!outputs/run_log.txt
+!outputs/fig_radar_example.png
+!outputs/fig_true_vs_pred.png
+!outputs/fig_error_hist.png
