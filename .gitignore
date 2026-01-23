@@ -1,6 +1,5 @@
 # big folders (do not commit)
 radar/
-outputs/
 
 # python cruft
 __pycache__/
@@ -13,11 +12,9 @@ __pycache__/
 # logs
 *.log
 
-# Ignore generated outputs by default
-outputs/
+# ignore outputs by default
+outputs/*
 
-# Keep demo artifacts
+# but keep the run log
+!outputs/
 !outputs/run_log.txt
-!outputs/fig_radar_example.png
-!outputs/fig_true_vs_pred.png
-!outputs/fig_error_hist.png
