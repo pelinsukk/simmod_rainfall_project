@@ -1,9 +1,0 @@
-Found radar files: 108418
-Example radar file: radar/2021/07/07/ras07-vol5minng01_sweeph5onem_dbzh_00-2021070700005700-ess-10410-hd5
-Paired samples: 2447
-MAE: 0.2822154225236763
-RMSE: 0.5499508825087133
-Saved figures in outputs/:
- - outputs/fig_radar_example.png
- - outputs/fig_true_vs_pred.png
- - outputs/fig_error_hist.png

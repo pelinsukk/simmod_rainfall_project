@@ -1,20 +1,10 @@
-# big folders (do not commit)
-radar/
-
-# python cruft
+/data/
+/radar/
+/outputs/
 __pycache__/
 *.pyc
 .venv/
 .env
 .ipynb_checkpoints/
 .DS_Store
-
-# logs
 *.log
-
-# ignore outputs by default
-outputs/*
-
-# but keep the run log
-!outputs/
-!outputs/run_log.txt

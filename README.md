@@ -1,128 +1,56 @@
-# SimMod Rainfall Prediction (Radar Reflectivity DBZH → 10-min Ground Precipitation) — Group Project Baseline Demo
+# Radar-based rainfall estimation | SimMod group project
 
-## Project Overview
+A reproducible baseline that estimates **10-minute ground rainfall depth** from weather-radar reflectivity (DBZH) around Cologne. It matches gauge timestamps to radar scans, extracts simple reflectivity features, and evaluates linear regression on a later time period. This repository contains the baseline implementation and an independently runnable synthetic demo.
 
-This is a baseline demo pipeline for our SimMod group project. The goal is end-to-end validation: load radar files → match timestamps → extract simple features → train baseline regression → save plots/logs. It is not meant to be a final model, just a reproducible baseline.
+## Run without course data
 
-## Project Goal
-
-- **Input**: Weather radar reflectivity DBZH snapshots over Cologne region, stored as HDF5 `*.hd5` files under `radar/`
-- **Target**: 10-minute ground precipitation measured at stations, provided as CSV labels
-- **Task**: Supervised regression (predict precipitation intensity from radar information)
-
-## What is Implemented (Current Baseline)
-
-- Recursively scans `radar/` for files ending with `*.hd5`
-- Parses timestamps from radar filenames
-- Matches each precipitation timestamp to the nearest radar scan (within ±10 minutes)
-- Reads DBZH values from the radar HDF5 structure and converts them to dBZ using gain/offset metadata
-- Extracts simple global radar features from each radar frame:
-  - mean DBZH
-  - max DBZH
-  - 90th percentile DBZH
-- Trains a baseline regression model (`LinearRegression`)
-- Saves a run log and diagnostic plots into `outputs/`
-
-## Data Layout (Local)
-
-Raw radar data is large and therefore not meant to be committed to GitHub. Users should keep `radar/` locally and the repo should stay lightweight.
-
-Expected local folder structure:
-
-```text
-radar/
-  2021/
-    07/
-      07/
-        .../*.hd5
-    08/
-      .../*.hd5
-    ...
-  2022/
-    01/
-      .../*.hd5
-    ...
-data/
-  precip_10min_long_balanced.csv
-  Station_Features_Lookup.csv
-outputs/
-  [created at runtime]
-```
-
-## CSV Files
-- `data/precip_10min_long_balanced.csv`: Label dataset with 10-minute precipitation values and timestamps (used as target `y`)
-- `data/Station_Features_Lookup.csv`: Station lookup / metadata mapping table used by the pipeline
-
-
-## How to Run the Demo
-From the repo root:
+From the repository root, with Python 3.11 or newer:
 
 ```bash
-python --version
-pip install -r requirements.txt
-mkdir -p outputs
-python src/run_demo.py > outputs/run_log.txt 2>&1
-tail -n 60 outputs/run_log.txt
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python src/run_demo.py --synthetic
+python -m unittest discover -s tests -v
 ```
 
-## Output Files
+The demo generates deterministic HDF5 radar arrays and CSV targets under `outputs/synthetic_inputs/`. It writes `outputs/metrics.json` and `outputs/holdout.png`. Synthetic scores check the implementation; they do not measure performance on Cologne observations.
 
-The demo saves outputs into `outputs/`:
+### Example synthetic holdout
 
-- `outputs/run_log.txt`: Run summary (radar file count, paired sample count, MAE/RMSE, etc.)
-- `outputs/fig_radar_example.png`: Example radar DBZH image (sanity check)
-- `outputs/fig_true_vs_pred.png`: Scatter plot of true vs predicted precipitation (baseline model)
-- `outputs/fig_error_hist.png`: Error histogram (pred - true)
+120 generated pairs: 90 for training and 30 for testing. The test window is 15:00–19:50 UTC on 1 January 2025 (synthetic timestamps).
 
+| Model | MAE (mm) | RMSE (mm) |
+| --- | ---: | ---: |
+| Training median | 0.500 | 0.570 |
+| Linear regression | 0.109 | 0.144 |
 
-## Baseline Results
-Metrics are sanity-check values, not final performance.
-The baseline uses only global summary statistics, so it is expected to be limited.
+![Synthetic holdout: observed toy targets, regression estimates and constant baseline](docs/synthetic-holdout.png)
 
-Success at this stage means:
-- the pipeline runs end-to-end
-- timestamp matching works reliably
-- feature extraction is consistent
-- outputs are reproducible
+## Use authorised course data
 
+The original radar and gauge observations were supplied for the university course. There is no verified public download for those exact files. Obtain them from the course materials or ask the teaching team for access. No original observations or run artefacts are included in the current checkout.
 
-## Notes / Next Steps
-Potential improvements for the next iteration:
+Place files under the ignored `radar/` and `data/` directories, or pass other local paths:
 
-- Better spatial features around station locations (pooling/aggregation, not global stats)
-- Multi-elevation / vertical structure features
-- Stronger baselines (Ridge/Lasso, tree-based models, neural networks)
-- Proper time-based train/val/test split to avoid leakage
-- Scale evaluation to longer spans (full year / multi-year)
+```bash
+python src/run_demo.py --radar-dir radar \
+  --precip-csv data/precip_10min_long_balanced.csv --station NMS0101
+```
 
+- **Radar:** HDF5 files under nested directories are supported. Filenames contain a UTC timestamp such as `-20210707000005700-` (the first 14 digits encode seconds). The reader expects `dataset1/data1/data` and gain/offset metadata in `dataset1/data1/what`.
+- **Gauge CSV:** columns `Timestamp` (interval end), `Station` and `Precipitation` (depth in mm over 10 minutes). Timestamps without an offset are interpreted as UTC. Invalid or negative targets are excluded. A station lookup is unnecessary for these global features.
+- **Outputs:** set `--out-dir` to keep real and synthetic runs separate. Git ignores the default output directory.
 
-## Contributors
-- Beshoy Hanna Ayaad Labib (blabib@smail.uni-koeln.de)
-- Fariba Yazdanjooei (fyazdanj@smail.uni-koeln.de)
-- Mohammed Fawaz Nawaz (mnawaz@smail.uni-koeln.de)
-- Pelin Su Kaplan (pkaplan@smail.uni-koeln.de)
-- Raj Nandini Singh (rsingh8@smail.uni-koeln.de)
-- Udayan Mishra (umishra@smail.uni-koeln.de)
+## Method and evaluation
 
-## License
-Educational / university course project, no commercial use intended.
+1. Match each valid gauge target to the latest radar scan at or before its timestamp, within a 10-minute tolerance by default.
+2. Decode reflectivity into dBZ, exclude missing and below-detection codes, and compute the mean, maximum and 90th percentile over finite pixels.
+3. Hold out the last 25% of usable pairs in time order. Purge training rows that share a test scan or overlap the first test target's 10-minute accumulation window.
+4. Compare nonnegative linear-regression estimates with the training-period median. Report MAE and RMSE in mm, sample counts and the exact UTC date ranges.
 
-## Citation / References
-Radar reflectivity (DBZH) and station precipitation data are course-provided datasets.
-If the instructors provide an official dataset citation/link, it will be added here.
+This is an estimate at the gauge interval end. It can use a scan during that interval, so it does not establish forecast skill. The features summarise the full radar frame rather than a neighbourhood around the station. One holdout does not establish generalisation across stations, seasons or storm events.
 
+## Project credit
 
-## Known Limitations / Assumptions
-- Only global radar summary statistics (mean/max/p90), ignores spatial structure
-- Radar → precipitation mapping is highly non-linear and depends on physical factors not represented in baseline
-- Nearest-neighbor timestamp matching with fixed ±10 minute window may introduce mismatch
-- Results depend on locally available radar files and paired sample count
-
-
-## Reproducibility Notes
-- Dependencies listed in `requirements.txt`
-- Keep `radar/` out of GitHub
-- Store run outputs in `outputs/` and keep `outputs/run_log.txt` for exact run record
-
-
-
+University of Cologne SimMod group project. Contributors: Beshoy Hanna Ayaad Labib, Fariba Yazdanjooei, Mohammed Fawaz Nawaz, Pelin Su Kaplan, Raj Nandini Singh and Udayan Mishra. Course data are distributed separately; access and redistribution follow the provider's terms.
